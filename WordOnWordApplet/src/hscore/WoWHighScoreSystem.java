@@ -1,55 +1,53 @@
 package hscore;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 
 import javax.swing.JOptionPane;
 
+import main.WordOnWord;
+
 import utils.Helpers;
 
-import com.google.gdata.client.spreadsheet.SpreadsheetService;
-import com.google.gdata.data.spreadsheet.ListEntry;
-import com.google.gdata.data.spreadsheet.ListFeed;
-import com.google.gdata.util.AuthenticationException;
-import com.google.gdata.util.ServiceException;
-
-
 public class WoWHighScoreSystem implements HighScoreSystem {
-	
-	private static final String USERNAME = "shmiagames@gmail.com";
-	private static final String PASSWORD = "holmsund19";
+	/**
+	 * The URL to the high score service
+	 */
+	private static final String HIGH_SCORE_SERVICE_URL = "http://highscoresystemes86.appspot.com/highscoresystem";
 	
 	private HighScoreListDialog highScoreDialog;
 	
-	private SpreadsheetService highScoreService;
-	private URL[] readWSListFeedURL, writeWSListFeedURL;
-	
 	private int language;
 	
-	public WoWHighScoreSystem(URL[] unsortedListFeeds, URL[] sortedListFeeds, HighScoreListDialog highScoreListDialog)
+	public WoWHighScoreSystem(HighScoreListDialog highScoreListDialog)
 	{
 		language = 0;
-		
-		readWSListFeedURL = sortedListFeeds;
-		writeWSListFeedURL = unsortedListFeeds;
 		this.highScoreDialog = highScoreListDialog;
-		
-		highScoreService = new SpreadsheetService("HighScoreService");
-		
-		//Make a spreadsheet service
-		try 
-		{
-			highScoreService.setUserCredentials(USERNAME, PASSWORD);
-		} catch (AuthenticationException e) {
-			System.err.println("Could not authenicate user");
-			e.printStackTrace();
-		}
 	}
 	
 	public void setActiveLanguage(int language)
 	{
 		this.language = language;
+	}
+	
+	private String getLanguageString()
+	{
+		switch(language)
+		{
+		case WordOnWord.SWEDISH:
+			return "swe";
+		case WordOnWord.ENGLISH:
+			return "eng";
+		case WordOnWord.GERMAN:
+			return "ger";
+		default:
+			return "swe";
+		}
 	}
 	
 	public void registerScore(Object[] args)
@@ -68,46 +66,93 @@ public class WoWHighScoreSystem implements HighScoreSystem {
 		
 		if(name != null)
 		{
-			registerScore(score, words, name);
-			showHighScoreList();
+			try
+			{
+				URLConnection hscoreConn = getHighScoreConnection(score, words, name);
+				
+				if(hscoreConn != null)
+				{
+					hscoreConn.connect();
+					showHighScoreList(hscoreConn);
+				}
+			}
+			catch(IOException e)
+			{
+				System.err.println("WordOnWord: Could not connect to the highscore service");
+				e.printStackTrace();
+			}
 		}
 	}
 	
-	private void registerScore(int score, int words, String name)
+	private URLConnection getHighScoreConnection(int score, int words, String name)
+	{
+		try 
+		{
+			URL registerHighScoreURL = new URL(HIGH_SCORE_SERVICE_URL + "?highScoreList=wordonword_" + getLanguageString() + 
+											   "&name=" + name + 
+											   "&score=" + Integer.toString(score) + 
+											   "&words=" + Integer.toString(words) + 
+											   "&date=" + Helpers.getCurrentTimeUTC());
+			
+			return registerHighScoreURL.openConnection();
+			
+		} catch (IOException e) {
+			System.err.println("WordOnWord: Could not get a connection to the high score service");
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	private URLConnection getHighScoreConnection()
 	{	
 		try 
 		{
-			ListEntry newEntry = new ListEntry();
-			newEntry.getCustomElements().setValueLocal("name", name);
-			newEntry.getCustomElements().setValueLocal("score", Integer.toString(score));
-			newEntry.getCustomElements().setValueLocal("words", Integer.toString(words));
-			newEntry.getCustomElements().setValueLocal("date", Helpers.getCurrentTimeUTC());
-			highScoreService.insert(writeWSListFeedURL[language], newEntry);
+			URL registerHighScoreURL = new URL(HIGH_SCORE_SERVICE_URL + "?highScoreList=wordonword_" + getLanguageString());	
+			return registerHighScoreURL.openConnection();	
 		} catch (IOException e) {
-			System.err.println("WordOnWord: Could not add score entry");
+			System.err.println("WordOnWord: Could not get a connection to the high score service");
 			e.printStackTrace();
-		} catch (ServiceException e) {
-			System.err.println("WordOnWord: Could not add score entry");
-			e.printStackTrace();
-		}
+			return null;
+		} 
 	}
 	
-	public void showHighScoreList()
+	public void showHighScoreList(URLConnection highScoreServiceConn)
 	{
+		InputStream highScoreStream = null;
+		
 		try {
-			ListFeed scoreRowFeed = highScoreService.getFeed(readWSListFeedURL[language], ListFeed.class);
+			highScoreStream = highScoreServiceConn.getInputStream();
+			BufferedReader reader = new BufferedReader(new InputStreamReader(highScoreStream));
 			
+			String line;
 			ArrayList<Object[]> highScoreList = new ArrayList<Object[]>();
 			
-			for(ListEntry row : scoreRowFeed.getEntries())
+			while((line = reader.readLine()) != null)
 			{
+				String[] highScoreData = line.split(",");
 				Object[] objRow = new Object[4];
-				objRow[0] = row.getCustomElements().getValue("name");
-				objRow[1] = row.getCustomElements().getValue("score");
-				objRow[2] = row.getCustomElements().getValue("words");
 				
-				objRow[3] = row.getCustomElements().getValue("date");
-				objRow[3] = Helpers.utcToLocalTime((String)objRow[3]);
+				for(String highScoreItem : highScoreData)
+				{
+					String[] components = highScoreItem.split("=");
+					
+					if(components[0].equals("name"))
+					{
+						objRow[0] = components[1];
+					}
+					else if(components[0].equals("score"))
+					{
+						objRow[1] = components[1];
+					}
+					else if(components[0].equals("words"))
+					{
+						objRow[2] = components[1];
+					}
+					else if(components[0].equals("date"))
+					{
+						objRow[3] = Helpers.utcToLocalTime(components[1]);
+					}
+				}
 				
 				highScoreList.add(objRow);
 			}
@@ -115,11 +160,25 @@ public class WoWHighScoreSystem implements HighScoreSystem {
 			highScoreDialog.setHighScoreList(highScoreList);
 			highScoreDialog.setVisible(true);
 		} catch (IOException e) {
-			System.err.println("WordOnWord: Could not load score rows");
-			e.printStackTrace();
-		} catch (ServiceException e) {
-			System.err.println("WordOnWord: Could not load score rows");
+			System.err.println("WordOnWord: Could not show high score list");
 			e.printStackTrace();
 		}
+		finally
+		{
+			try {
+				highScoreStream.close();
+			} catch (IOException e) {
+				System.err.println("WordOnWord: Could not close highscore stream");
+				e.printStackTrace();
+			}
+		}
+	}
+	
+	public void showHighScoreList()
+	{
+		URLConnection highScoreConn = getHighScoreConnection();
+		
+		if(highScoreConn != null)
+			showHighScoreList(highScoreConn);
 	}
 }

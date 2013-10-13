@@ -179,10 +179,7 @@ public class WordOnWord extends JApplet implements Runnable {
 		//Make the word checker
 		wordChecker = makeWoWWordChecker();
 		//Make the highscore system
-		highScoreSystem = new WoWHighScoreSystem(makeUnsortedListFeedURLs(), 
-												 makeSortedListFeedURLs(), 
-												 new HighScoreListDialog(new WoWHighScoreTableModel())
-												 );
+		highScoreSystem = new WoWHighScoreSystem(new HighScoreListDialog(new WoWHighScoreTableModel()));
 		//Make sound player
 		soundPlayer = makeWoWSoundPlayer();
 		//Make the game engine
@@ -429,57 +426,5 @@ public class WordOnWord extends JApplet implements Runnable {
 		soundPlayer.loadClip("sounds/word_7.wav", "word_7");
 		
 		return soundPlayer;
-	}
-	
-	private URL[] makeUnsortedListFeedURLs()
-	{
-		URL[] urls = new URL[3];
-		
-		try
-		{
-			//Swedish
-			urls[0] = new URL("https://spreadsheets.google.com/feeds/list/0AoEkGUD3TJaCdENWMlJGZHNTazNiakU0dVM3NDlONmc/od6/private/full");
-			//English
-			urls[1] = new URL("https://spreadsheets.google.com/feeds/list/0AoEkGUD3TJaCdHk4WG56MFFsSFhQV0p3TDdiSXpDVWc/od6/private/full");
-			//German
-			urls[2] = new URL("https://spreadsheets.google.com/feeds/list/0AoEkGUD3TJaCdEd1VEpmb2xNUzVTSUlULVNHT1FYbVE/od6/private/full");
-		}
-		catch(MalformedURLException e)
-		{
-			System.err.println("WordOnWord: The provided URL is malformed");
-			e.printStackTrace();
-			//Make all urls null just in case
-			urls[0] = null;
-			urls[1] = null;
-			urls[2] = null;
-		}
-		
-		return urls;
-	}
-	
-	private URL[] makeSortedListFeedURLs()
-	{
-		URL[] urls = new URL[3];
-		
-		try
-		{
-			//Swedish
-			urls[0] = new URL("https://spreadsheets.google.com/feeds/list/0AoEkGUD3TJaCdENWMlJGZHNTazNiakU0dVM3NDlONmc/od7/public/values");
-			//English
-			urls[1] = new URL("https://spreadsheets.google.com/feeds/list/0AoEkGUD3TJaCdHk4WG56MFFsSFhQV0p3TDdiSXpDVWc/od7/public/values");
-			//German
-			urls[2] = new URL("https://spreadsheets.google.com/feeds/list/0AoEkGUD3TJaCdEd1VEpmb2xNUzVTSUlULVNHT1FYbVE/od7/public/values");
-		}
-		catch(MalformedURLException e)
-		{
-			System.err.println("WordOnWord: The provided URL is malformed");
-			e.printStackTrace();
-			//Make all urls null just in case
-			urls[0] = null;
-			urls[1] = null;
-			urls[2] = null;
-		}
-		
-		return urls;
 	}
 }
